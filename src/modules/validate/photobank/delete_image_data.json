@@ -1,0 +1,11 @@
+{
+  "title": "delete_image_data",
+  "type": "object",
+  "properties": {
+    "ids": {
+      "type": "array",
+      "minItems": 1
+    }
+  },
+  "required": ["ids"]
+}

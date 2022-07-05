@@ -1,0 +1,16 @@
+{
+  "title": "get_image_data",
+  "type": "object",
+  "properties": {
+    "select": {
+      "type": "array"
+    },
+    "options": {
+      "type": "object"
+    },
+    "filter": {
+      "type": "object"
+    }
+  },
+  "required": ["select"]
+}

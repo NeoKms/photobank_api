@@ -1,0 +1,13 @@
+{
+  "title": "set_image_data",
+  "type": "object",
+  "properties": {
+    "images_metadata": {
+      "type": "string"
+    },
+    "tmp_0": {
+      "type": "object"
+    }
+  },
+  "required": ["images_metadata", "tmp_0"]
+}

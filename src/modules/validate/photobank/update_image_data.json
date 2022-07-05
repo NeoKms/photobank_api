@@ -1,0 +1,10 @@
+{
+  "title": "set_image_data",
+  "type": "object",
+  "properties": {
+    "images_metadata": {
+      "type": "array"
+    }
+  },
+  "required": ["images_metadata"]
+}

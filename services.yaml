@@ -1,0 +1,28 @@
+version: "3.3"
+services:
+  photobank_redis:
+    container_name: photobank_redis
+    image: redis:latest
+    restart: always
+    ports:
+      - "*********:6379"
+    volumes:
+      - "*********:/data"
+  photobank_mariadb:
+    container_name: photobank_mariadb
+    #raspberry pi 4: image: 459below/mariadb-armv7
+    image: mariadb
+    restart: always
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=*********
+      - MYSQL_DATABASE=*********
+      - MYSQL_USER=*********
+      - MYSQL_PASSWORD=*********
+    volumes:
+      - "*********:/var/lib/mysql"
+networks:
+  default:
+    external:
+      name: photobank_net

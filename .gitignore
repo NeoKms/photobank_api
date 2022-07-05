@@ -1,0 +1,7 @@
+.idea/
+.env
+node_modules/
+upload/
+.eslintcache
+services copy.yaml
+push.yaml
