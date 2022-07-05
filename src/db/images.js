@@ -287,6 +287,44 @@ module.exports = class Images {
     return res;
   };
 
+  async prepareSources(images, con) {
+    let items = Array.from(
+      new Set(
+        images.reduce((acc, image) => {
+          if (image.newSource?.trim()) {
+            acc.push(image.newSource.trim());
+          }
+          return acc;
+        }, [])
+      )
+    );
+    for (let i = 0, c = items.length; i < c; i++) {
+      let sourceExist = await this.getSourceByName(items[i], con);
+      if (!sourceExist) {
+        await this.setSource(items[i], con);
+      }
+    }
+  }
+
+  async prepareAuthors(images, con) {
+    let items = Array.from(
+      new Set(
+        images.reduce((acc, image) => {
+          if (image.newAuthor?.trim()) {
+            acc.push(image.newAuthor.trim());
+          }
+          return acc;
+        }, [])
+      )
+    );
+    for (let i = 0, c = items.length; i < c; i++) {
+      let authorExist = await this.getAuthorByName(items[i], con);
+      if (!authorExist) {
+        await this.setAuthor(items[i], con);
+      }
+    }
+  }
+
   async prepareTags(images, con) {
     let tagsNew = Array.from(
       new Set(
@@ -308,6 +346,8 @@ module.exports = class Images {
       connection = con || (await mysql.connection());
       await connection.beginTransaction();
       await this.prepareTags(data);
+      await this.prepareAuthors(data);
+      await this.prepareSources(data);
       let chunks = splitToChunks(data, 10);
       for (let chunk of chunks) {
         let promises = [];
@@ -336,6 +376,8 @@ module.exports = class Images {
       connection = con || (await mysql.connection());
       await connection.beginTransaction();
       await this.prepareTags(data);
+      await this.prepareAuthors(data);
+      await this.prepareSources(data);
       let chunks = splitToChunks(data, 10);
       for (let chunk of chunks) {
         let promises = [];
