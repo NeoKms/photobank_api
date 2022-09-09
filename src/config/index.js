@@ -42,14 +42,4 @@ config.REDIS_SETTINGS = {
   key: env.REDIS_KEY,
 };
 
-config.WS = {
-  URL: env.WS_URL,
-};
-
-config.NODE_AUTH = {
-  login: env.AUTH_LOGIN,
-  password: env.AUTH_PASS,
-  url: env.AUTH_HOST,
-};
-
 module.exports = config;

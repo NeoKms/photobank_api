@@ -11,7 +11,7 @@ CREATE TABLE `users`  (
   PRIMARY KEY (`id`)
 );
 
-INSERT INTO `test`.`users` (`id`, `login`, `password_hash`, `fullname`, `rights`) VALUES (1, 'collector1', '41a446d693b66b3548c2d676ca320a3e', 'Пользователь 1', '{"mh_photobank":2,"mh_photobank_trash":2}');
+INSERT INTO `users` (`id`, `login`, `password_hash`, `fullname`, `rights`) VALUES (1, 'root', 'aea2ae42303906100969a9f04ad5a514', 'Пользователь 1', '{"mh_photobank":2,"mh_photobank_trash":2}');
 
 DROP TABLE IF EXISTS `tags`;
 CREATE TABLE `tags`  (
@@ -86,11 +86,20 @@ CREATE TABLE IF NOT EXISTS `used_images`  (
       `timestamp` int NOT NULL, 
       `user_str` text, 
       CONSTRAINT `usedimages_pk` PRIMARY KEY (`image_id`, `user_id`, `timestamp`), 
-      CONSTRAINT `usedimages_imageid` FOREIGN KEY ( `image_id` ) REFERENCES `posts`.`images` ( `id` ) ON DELETE CASCADE ON UPDATE CASCADE, 
-      CONSTRAINT `usedimages_userid` FOREIGN KEY ( `user_id` ) REFERENCES `posts`.`users` ( `id` ) ON DELETE CASCADE ON UPDATE CASCADE 
+      CONSTRAINT `usedimages_imageid` FOREIGN KEY ( `image_id` ) REFERENCES `images` ( `id` ) ON DELETE CASCADE ON UPDATE CASCADE,
+      CONSTRAINT `usedimages_userid` FOREIGN KEY ( `user_id` ) REFERENCES `users` ( `id` ) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 DROP VIEW IF EXISTS `image_users_list`;
-CREATE VIEW `image_users_list` AS select `users`.`fullname` AS `name`,`users`.`id` AS `id` from (`users` join `images` on(`images`.`user_id` = `users`.`id` and `images`.`is_pb` = 1)) group by `users`.`id`;
+CREATE VIEW `image_users_list` AS select `users`.`fullname` AS `name`,`users`.`id` AS `id`,count(`images`.`id`) AS `cnt_images`,sum(if(`images`.`deleted_at` is null,1,0)) AS `cnt_active`,sum(if(`images`.`deleted_at` is null,0,1)) AS `cnt_deleted` from (`users` join `images` on(`images`.`user_id` = `users`.`id` and `images`.`is_pb` = 1)) group by `users`.`id`;
+
+DROP TABLE IF EXISTS `watermarks`;
+CREATE TABLE `watermarks`  (
+   `id` int NOT NULL AUTO_INCREMENT,
+   `name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL DEFAULT NULL,
+   `type` tinyint NULL DEFAULT NULL COMMENT '1 - лого, 2 - заливка',
+   `path` text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL,
+   PRIMARY KEY (`id`) USING BTREE
+);
 
 SET FOREIGN_KEY_CHECKS = 1;

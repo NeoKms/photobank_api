@@ -1,0 +1,19 @@
+{
+  "title": "set_watermark",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string"
+    },
+    "file": {
+      "type": "object"
+    }
+  },
+  "required": ["name", "type", "file"]
+}

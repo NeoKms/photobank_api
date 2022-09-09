@@ -23,7 +23,6 @@ const gen = (...entity) => ({
           result.push(item);
         }
       }
-      console.log(val, entity, req.user);
       if (result.length > 0) {
         if (valid(req, res, next, val)) {
           next();

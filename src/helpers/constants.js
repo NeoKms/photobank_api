@@ -1,5 +1,30 @@
 module.exports = {
   maps: {
+    watermarks: {
+      map: {
+        id: {
+          item: "watermarks.id",
+          type: "number",
+          table: false,
+        },
+        name: {
+          item: "watermarks.name",
+          type: "string",
+          table: false,
+        },
+        type: {
+          item: "watermarks.type",
+          type: "number",
+          table: false,
+        },
+        path: {
+          item: "watermarks.path",
+          type: "string",
+          table: false,
+        },
+      },
+      tables: {},
+    },
     images: {
       map: {
         id: {
@@ -138,6 +163,21 @@ module.exports = {
         name: {
           item: "image_users_list.name",
           type: "string",
+          table: false,
+        },
+        cnt_images: {
+          item: "image_users_list.cnt_images",
+          type: "number",
+          table: false,
+        },
+        cnt_active: {
+          item: "image_users_list.cnt_active",
+          type: "number",
+          table: false,
+        },
+        cnt_deleted: {
+          item: "image_users_list.cnt_deleted",
+          type: "number",
           table: false,
         },
       },

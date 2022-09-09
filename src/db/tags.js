@@ -1,6 +1,8 @@
 const mysql = require("../helpers/mysqla.js");
 const logger = require("../helpers/logger");
 const DBWrapper = require("../modules/db.interface");
+const maps = require("../helpers/constants").maps;
+
 module.exports = class Tags {
   externalDB = {};
 
@@ -15,11 +17,10 @@ module.exports = class Tags {
     let connection, res;
     try {
       connection = con || (await mysql.connection());
-      let wrapper = await new DBWrapper("tags", connection, false).selectValue(
-        select,
-        filter,
-        hastest
-      );
+      let wrapper = await new DBWrapper("tags", connection, {
+        debug: false,
+        mapObj: maps.tags,
+      }).selectValue(select, filter, hastest);
       if (options?.itemsPerPage) {
         wrapper.paginate(options);
       }

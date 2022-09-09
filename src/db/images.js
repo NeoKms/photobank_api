@@ -1,8 +1,9 @@
 const mysql = require("../helpers/mysqla.js");
 const logger = require("../helpers/logger");
-const { getTags, splitToChunks } = require("../helpers/helpers");
+const { getTags, splitToChunks, deleteFileByPath } = require("../helpers/helpers");
 const DBWrapper = require("../modules/db.interface");
 const Imaginator = require("../modules/imaginator");
+const maps = require("../helpers/constants").maps;
 
 module.exports = class Images {
   externalDB = {};
@@ -10,6 +11,99 @@ module.exports = class Images {
   setExternalDB(external) {
     this.externalDB = external;
   }
+
+  insertWatermark = async (image, data, con) => {
+    let connection,
+      res = [];
+    try {
+      connection = con || (await mysql.connection());
+      await connection.beginTransaction();
+      let imaginator = await new Imaginator(this.externalDB)
+        .setConnection(connection)
+        .setOriginalOnly(true)
+        .setExternalExt(".png")
+        .fromFile(image.file);
+      let imageId = imaginator.getImageId();
+      let paths = await imaginator.getPathsAll();
+
+      await connection.query(
+        "INSERT INTO watermarks (`id`, `name`, `type`, `path`) VALUES (?,?,?,?)",
+        [imageId, data.name, data.type, paths.full]
+      );
+
+      await connection.query(
+        "update `images` set `description` = ?, `created_at` = ?, `type` =  ?, `path` = ? where id=?",
+        [data.name, Math.round(Date.now() / 1000), 2, paths.full, imageId]
+      );
+      await connection.commit();
+    } catch (err) {
+      if (connection && !con) {
+        await connection.rollback();
+      }
+      logger.error(err, "images.insertWatermark:");
+      throw err;
+    } finally {
+      if (connection && !con) await connection.release();
+    }
+    return res;
+  };
+
+  filterWatermark = async (
+    { select = [], filter = {}, hasarr = [], options = {} },
+    con
+  ) => {
+    let connection, res;
+    try {
+      connection = con || (await mysql.connection());
+
+      res = await new DBWrapper("watermarks", connection, {
+        debug: false,
+        mapObj: maps.watermarks,
+      })
+        .selectValue(select, filter, hasarr)
+        .orderBy(options)
+        .paginate(options)
+        .runQuery();
+
+      res = {
+        page: res.pagination.page,
+        maxPages: res.pagination.maxPages,
+        allCount: res.pagination.all,
+        data: res.queryResult,
+      };
+    } catch (err) {
+      logger.error(err, "images.filterWatermark:");
+    } finally {
+      if (connection && !con) await connection.release();
+    }
+    return res;
+  };
+
+  deleteWatermark = async (id, con) => {
+    let connection;
+    try {
+      connection = con || (await mysql.connection());
+      await connection.beginTransaction();
+      let [deletedWatermark] = await connection.query(
+        "DELETE FROM `watermarks` WHERE id = ? returning path",
+        [id]
+      );
+      try {
+        await deleteFileByPath(deletedWatermark.path);
+      } catch (err) {
+        //do nothing
+      }
+      await connection.commit();
+    } catch (err) {
+      if (connection && !con) {
+        await connection.rollback();
+      }
+      logger.error(err, "images.deleteWatermark:");
+      throw err;
+    } finally {
+      if (connection && !con) await connection.release();
+    }
+  };
 
   getIdNew = async (filename, con) => {
     let connection, res;
@@ -85,7 +179,10 @@ module.exports = class Images {
       }
       connection = con || (await mysql.connection());
 
-      res = await new DBWrapper("images", connection, false)
+      res = await new DBWrapper("images", connection, {
+        debug: false,
+        mapObj: maps.images,
+      })
         .selectValue(select, filter, hasarr)
         .orderBy(options)
         .paginate(options)
@@ -134,6 +231,9 @@ module.exports = class Images {
             }
           });
           item.tags_names = tags_names;
+        }
+        if (res.has.used && !item.used) {
+          item.used = [];
         }
       }
 
@@ -532,7 +632,10 @@ module.exports = class Images {
       }
       connection = con || (await mysql.connection());
 
-      res = await new DBWrapper("image_users_list", connection, false)
+      res = await new DBWrapper("image_users_list", connection, {
+        debug: false,
+        mapObj: maps.image_users_list,
+      })
         .selectValue(select, filter, hasarr)
         .orderBy(options)
         .paginate(options)
@@ -564,7 +667,10 @@ module.exports = class Images {
       }
       connection = con || (await mysql.connection());
 
-      res = await new DBWrapper("images_authors", connection, false)
+      res = await new DBWrapper("images_authors", connection, {
+        debug: false,
+        mapObj: maps.images_authors,
+      })
         .selectValue(select, filter, hasarr)
         .orderBy(options)
         .paginate(options)
@@ -596,7 +702,10 @@ module.exports = class Images {
       }
       connection = con || (await mysql.connection());
 
-      res = await new DBWrapper("images_sources", connection, false)
+      res = await new DBWrapper("images_sources", connection, {
+        debug: false,
+        mapObj: maps.images_sources,
+      })
         .selectValue(select, filter, hasarr)
         .orderBy(options)
         .paginate(options)
