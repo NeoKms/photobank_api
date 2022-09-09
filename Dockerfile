@@ -1,5 +1,5 @@
 FROM node:latest
-RUN apt update && apt install nano mc -y
+RUN apt-get update && apt-get install nano mc -y
 WORKDIR /var/photobank_api
 COPY . .
 RUN npm install -g npm@latest && \
