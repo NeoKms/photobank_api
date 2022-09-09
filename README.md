@@ -9,7 +9,7 @@
 
 ### Способ 3. docker-compose.
 
-В проекте лежат конфигурации для запуска. Надо взять два файла ```services.yaml``` и ```apps.yaml```, заполнить их данными и запустить (запускает так же и клиент фотобанка).
+В проекте лежат конфигурации для запуска. Надо взять два файла ```services.yaml``` и ```apps.yaml```, заполнить их данными и запустить ([запускает так же и клиент фотобанка](https://github.com/NeoKms/photobank)).
 
 ```docker-compose -f services.yaml up -d && docker-compose -f apps.yaml up -d ```
 
