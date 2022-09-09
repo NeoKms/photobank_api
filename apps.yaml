@@ -4,6 +4,9 @@ services:
     container_name: photobank_api
     image: upachko/photobank_api:arm7
     restart: always
+    depends_on:
+      - "photobank_redis"
+      - "photobank_mariadb"
     ports:
       - "********:80"
     environment:
@@ -18,14 +21,16 @@ services:
       REDIS_SECRET: ***********
       REDIS_KEY: ***********
       SENTRY_KEY: ***********
-      PRODUCTION: "false"
-      IS_LOCAL: "true"
+      PRODUCTION: "true"
+      IS_LOCAL: "false"
       LOCAL_DOMAIN: "http://domain.dev.lan/"
       PORT: 80
   photobank_client:
     container_name: photobank_client
     image: upachko/photobank:arm7
     restart: always
+    depends_on:
+      - "api"
     ports:
       - "********:80"
     environment:
