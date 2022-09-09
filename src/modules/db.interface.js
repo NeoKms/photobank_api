@@ -267,7 +267,8 @@ class DBWrapper {
           }
         }
         if (this.debug) {
-          this.debug && console.log(this.debug, "queryProps in runQuery", this.query);
+          this.debug &&
+            console.log(this.debug, "queryProps in runQuery", this.query);
           console.log(
             this.debug,
             "final query:",
@@ -292,7 +293,17 @@ class DBWrapper {
       )
       .then((queryResult) => (this.query.result = queryResult))
       .then(() => this.openJsonProps())
-      .then(() => this.debug && console.log(this.debug, 'query result:', this.query.result, 'query pagination:', this.query.pagination))
+      .then(
+        () =>
+          this.debug &&
+          console.log(
+            this.debug,
+            "query result:",
+            this.query.result,
+            "query pagination:",
+            this.query.pagination
+          )
+      )
       .then(() => ({
         queryResult: this.query.result,
         has: this.query.has,

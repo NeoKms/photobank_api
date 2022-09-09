@@ -1,6 +1,10 @@
 const mysql = require("../helpers/mysqla.js");
 const logger = require("../helpers/logger");
-const { getTags, splitToChunks, deleteFileByPath } = require("../helpers/helpers");
+const {
+  getTags,
+  splitToChunks,
+  deleteFileByPath,
+} = require("../helpers/helpers");
 const DBWrapper = require("../modules/db.interface");
 const Imaginator = require("../modules/imaginator");
 const maps = require("../helpers/constants").maps;
