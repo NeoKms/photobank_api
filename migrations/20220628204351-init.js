@@ -14,8 +14,8 @@ exports.setup = function(options, seedLink) {
   seed = seedLink;
 };
 
-exports.up = function(db) {
-  require('fs').readFile('migrations/init.sql', 'utf8', function(err, data) { if (err) throw err; db.runSql(data); });
+exports.up = async function(db) {
+  await require('fs').promises.readFile('migrations/init.sql', 'utf8').then(data=>db.runSql(data));
   return null;
 };
 
