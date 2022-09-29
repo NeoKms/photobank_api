@@ -91,11 +91,7 @@ module.exports = () => {
   router.post("/getList", isAccessRead(), async (req, res, next) => {
     try {
       let { options } = req.body;
-
-      let select = ["id", "name", "type", "path"];
-
-      let result = await db.images.filterWatermark({ select, options });
-
+      let result = await db.images.filterWatermark({ options });
       res.json({ message: "ok", result });
     } catch (error) {
       next(error);
@@ -130,14 +126,11 @@ module.exports = () => {
   router.get("/:id", isAccessRead(), async (req, res, next) => {
     try {
       let { id } = req.params;
-
-      let select = ["id", "name", "type", "path"];
-
       let filter = {
         id: Number.parseInt(id),
       };
 
-      let result = await db.images.filterWatermark({ select, filter });
+      let result = await db.images.filterWatermark({ filter });
 
       if (!result?.length) {
         throw new HttpError("Не найдено", 404);
