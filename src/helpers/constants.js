@@ -22,6 +22,11 @@ module.exports = {
           type: "string",
           table: false,
         },
+        configs: {
+          item: "watermarks.configs",
+          type: "json",
+          table: false,
+        },
       },
       tables: {},
     },
