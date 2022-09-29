@@ -1,4 +1,5 @@
-const { U_DIRS, IS_LOCAL, LOCAL_DOMAIN } = require("../config");
+const { U_DIRS, IS_DEV, IS_LOCAL, LOCAL_DOMAIN } = require("../config");
+const { sizeOf } = require("../helpers/helpers");
 const fs_sync = require("fs");
 const fs = fs_sync.promises;
 const {
@@ -8,14 +9,9 @@ const {
 } = require("../helpers/helpers");
 const axios = require("axios");
 const Sharp = require("sharp");
-const imageSize = require("image-size");
-const sizeOf = async (path) =>
-  new Promise((resolve, reject) =>
-    imageSize(path, (err, dimensions) => {
-      if (err) reject(err);
-      else resolve(dimensions);
-    })
-  );
+const PathModule = require("path");
+const Jimp = require("jimp");
+
 class Imaginator {
   externalDB = null;
   connection = null;
@@ -32,7 +28,19 @@ class Imaginator {
   externalFilePath = false;
   externalExt = false;
   originalOnly = false;
-  baseUrl = IS_LOCAL ? LOCAL_DOMAIN : "https://pbapi.jrgreez.ru/";
+  prefixes = ["full", "tablet", "mobile", "desktop"];
+  sizeOfData = {
+    height: 0,
+    width: 0,
+    type: "jpg",
+    ratio: 1,
+    ratioTitle: "1/1",
+  };
+  baseUrl = IS_LOCAL
+    ? LOCAL_DOMAIN
+    : IS_DEV
+    ? "http://smiapi.dev.lan/"
+    : "https://api-post.ttrace.ru/";
 
   constructor(external) {
     this.externalDB = external || require("../db/index");
@@ -53,6 +61,72 @@ class Imaginator {
     return this.id;
   }
 
+  __getRatioTitle() {
+    if (this.sizeOfData.ratio >= 0.8 && this.sizeOfData.ratio < 1.2) {
+      this.sizeOfData.ratioTitle = "1/1";
+    }
+    if (this.sizeOfData.ratio >= 1.2 && this.sizeOfData.ratio < 1.4) {
+      this.sizeOfData.ratioTitle = "4/3";
+    }
+    if (this.sizeOfData.ratio >= 1.4 && this.sizeOfData.ratio < 1.65) {
+      this.sizeOfData.ratioTitle = "3/2";
+    }
+    if (this.sizeOfData.ratio >= 1.65 && this.sizeOfData.ratio < 1.9) {
+      this.sizeOfData.ratioTitle = "16/9";
+    }
+  }
+
+  async loadExist(imagePath) {
+    const splitted = PathModule.basename(imagePath).split("_");
+    this.id = splitted.length ? splitted[0] : -1;
+    let size =
+      splitted.length >= 2
+        ? splitted[1].replace(".jpeg", "").replace(".webp", "")
+        : "full";
+    if (size !== "full") {
+      imagePath = imagePath.replace("_" + size, "_full");
+    }
+    this.sizeOfData = await sizeOf(imagePath);
+    this.sizeOfData.ratio = this.sizeOfData.width / this.sizeOfData.height;
+    this.__getRatioTitle();
+    const ext = this.sizeOfData.type;
+    if (ext !== "jpeg") {
+      imagePath = imagePath.replace(ext, "jpeg");
+    }
+    this.filePathFull = imagePath;
+    this.filePathTablet = imagePath.replace("_full", "_" + this.prefixes[1]);
+    this.filePathDesktop = imagePath.replace("_full", "_" + this.prefixes[3]);
+    this.filePathMobile = imagePath.replace("_full", "_" + this.prefixes[2]);
+    this.filePathFullWebp = this.filePathFull.replace(".jpeg", ".webp");
+    this.filePathDesktopWebp = this.filePathDesktop.replace(".jpeg", ".webp");
+    this.filePathTabletWebp = this.filePathTablet.replace(".jpeg", ".webp");
+    this.filePathMobileWebp = this.filePathMobile.replace(".jpeg", ".webp");
+    return this;
+  }
+
+  async renderWatermark({ id, path, configs }) {
+    const config = configs[this.sizeOfData.ratioTitle];
+    if (!config) {
+      throw new Error("imaginator: no config for this ratio");
+    }
+    const paths = this.getPathsFull();
+    const errors = [];
+    const outputPaths = [];
+    return Promise.all(
+      paths.map((imgPath) =>
+        this.__applyWatermark(imgPath, path, config)
+          .then((outputPath) => outputPaths.push(outputPath))
+          .catch((err) => errors.push(err.message))
+      )
+    ).then(() => ({
+      outputPaths,
+      errors,
+      isError: errors.length,
+      id: +this.id,
+      wm_id: id,
+    }));
+  }
+
   getActualPath() {
     let date = new Date();
     return checkAndCreateDir(
@@ -68,6 +142,9 @@ class Imaginator {
   }
   setExternalFilePath(path) {
     this.externalFilePath = path;
+    if (this.externalFilePath[this.externalFilePath.length - 1] !== "/") {
+      this.externalFilePath += "/";
+    }
     return this;
   }
   setExternalFileName(name) {
@@ -79,126 +156,117 @@ class Imaginator {
     return this;
   }
 
+  async __saveImage(originalImg, pathTo, { w, q }) {
+    const ext = PathModule.extname(pathTo).replace(".", "");
+    let metadata = await originalImg.metadata();
+    let stream = originalImg.clone();
+    if (metadata.width > w) {
+      stream.resize({ width: w });
+    }
+    if (["jpeg", "webp"].includes(ext)) {
+      stream[ext]({ quality: q });
+    }
+    if (ext === "jpeg") {
+      stream.flatten({ background: "#ffffff" });
+    }
+    return stream.toFile(pathTo);
+  }
+
   async fromFile(file) {
     if (
-      file.mimetype.indexOf("image") ||
-      file.mimetype.indexOf("webp") ||
-      this.externalExt
+      !this.originalOnly &&
+      file.mimetype.indexOf("image") === -1 &&
+      file.mimetype.indexOf("webp") === -1 &&
+      !this.externalExt
     ) {
-      //do nothing
-    } else {
       throw new Error("Попытка загрузить не изображение");
     }
     let filename = "";
-    if (this.externalFileName === false) {
+    if (!this.externalFileName) {
       filename = await this.getId(file.name);
     } else {
       filename = this.externalFileName;
     }
-    let actualPath = await this.getActualPath();
-    if (this.externalFilePath) {
+    let actualPath = "";
+    if (!this.externalFilePath) {
+      actualPath = await this.getActualPath();
+    } else {
       actualPath = await checkAndCreateDir(this.externalFilePath);
     }
     let pathWithName = actualPath + filename;
-    let ext = ".jpg";
-    if (this.externalExt) {
+    let ext = "";
+    if (PathModule.extname(pathWithName)) {
+      ext = PathModule.extname(pathWithName);
+      pathWithName = pathWithName.replace(ext, "");
+      this.externalExt = ext;
+    } else if (this.externalExt) {
       ext = this.externalExt;
+    } else {
+      ext = ".jpeg";
     }
-    if (ext === ".jpg" && !this.originalOnly) {
+    if (ext === ".jpeg" && !this.originalOnly) {
       let promises = [];
       let originalImg = await Sharp(file.data, {
         failOnError: false,
       });
-      let metadata = await originalImg.metadata();
       // full
-      let filePathFullJpeg = pathWithName + "_full" + ".jpeg";
-      let filePathFullWebp = pathWithName + "_full" + ".webp";
-      let fullStreamJpeg = originalImg.clone();
-      let fullStreamWebp = originalImg.clone();
-      if (metadata.width > 1920) {
-        fullStreamJpeg.resize({ width: 1920 });
-        fullStreamWebp.resize({ width: 1920 });
-      }
+      let filePathFullJpeg = pathWithName + `_${this.prefixes[0]}` + ".jpeg";
+      let filePathFullWebp = pathWithName + `_${this.prefixes[0]}` + ".webp";
       promises.push(
-        fullStreamJpeg
-          .jpeg({ quality: 80 })
-          .flatten({ background: "#ffffff" })
-          .toFile(filePathFullJpeg)
-          .then(() => (this.filePathFull = filePathFullJpeg)),
-        fullStreamWebp
-          .webp({ quality: 80 })
-          .toFile(filePathFullWebp)
-          .then(() => (this.filePathFullWebp = filePathFullWebp))
+        this.__saveImage(originalImg, filePathFullJpeg, {
+          w: 1920,
+          q: 80,
+        }).then(() => (this.filePathFull = filePathFullJpeg)),
+        this.__saveImage(originalImg, filePathFullWebp, {
+          w: 1920,
+          q: 80,
+        }).then(() => (this.filePathFullWebp = filePathFullWebp))
       );
       // desktop
-      let filePathDesktopJpeg = pathWithName + "_desktop" + ".jpeg";
-      let filePathdesktopWebp = pathWithName + "_desktop" + ".webp";
-      let desktopStreamJpeg = originalImg.clone();
-      let desktopStreamWebp = originalImg.clone();
-      if (metadata.width > 930) {
-        desktopStreamJpeg.resize({ width: 930 });
-        desktopStreamWebp.resize({ width: 930 });
-      }
+      let filePathDesktopJpeg = pathWithName + `_${this.prefixes[3]}` + ".jpeg";
+      let filePathdesktopWebp = pathWithName + `_${this.prefixes[3]}` + ".webp";
       promises.push(
-        desktopStreamJpeg
-          .jpeg({ quality: 80 })
-          .flatten({ background: "#ffffff" })
-          .toFile(filePathDesktopJpeg)
-          .then(() => (this.filePathDesktop = filePathDesktopJpeg)),
-        desktopStreamWebp
-          .webp({ quality: 80 })
-          .toFile(filePathdesktopWebp)
-          .then(() => (this.filePathDesktopWebp = filePathdesktopWebp))
+        this.__saveImage(originalImg, filePathDesktopJpeg, {
+          w: 930,
+          q: 80,
+        }).then(() => (this.filePathDesktop = filePathDesktopJpeg)),
+        this.__saveImage(originalImg, filePathdesktopWebp, {
+          w: 930,
+          q: 80,
+        }).then(() => (this.filePathDesktopWebp = filePathdesktopWebp))
       );
       // tablet
-      let filePathTabletJpeg = pathWithName + "_tablet" + ".jpeg";
-      let filePathTabletWebp = pathWithName + "_tablet" + ".webp";
-      let tabletStreamJpeg = originalImg.clone();
-      let tabletStreamWebp = originalImg.clone();
-      if (metadata.width > 720) {
-        tabletStreamJpeg.resize({ width: 720 });
-        tabletStreamWebp.resize({ width: 720 });
-      }
+      let filePathTabletJpeg = pathWithName + `_${this.prefixes[1]}` + ".jpeg";
+      let filePathTabletWebp = pathWithName + `_${this.prefixes[1]}` + ".webp";
       promises.push(
-        tabletStreamJpeg
-          .jpeg({ quality: 100 })
-          .flatten({ background: "#ffffff" })
-          .toFile(filePathTabletJpeg)
-          .then(() => (this.filePathTablet = filePathTabletJpeg)),
-        tabletStreamWebp
-          .webp({ quality: 100 })
-          .toFile(filePathTabletWebp)
-          .then(() => (this.filePathTabletWebp = filePathTabletWebp))
+        this.__saveImage(originalImg, filePathTabletJpeg, {
+          w: 720,
+          q: 100,
+        }).then(() => (this.filePathTablet = filePathTabletJpeg)),
+        this.__saveImage(originalImg, filePathTabletWebp, {
+          w: 720,
+          q: 100,
+        }).then(() => (this.filePathTabletWebp = filePathTabletWebp))
       );
       // mobile
-      let filePathMobileJpeg = pathWithName + "_mobile" + ".jpeg";
-      let filePathMobileWebp = pathWithName + "_mobile" + ".webp";
-      let mobileStreamJpeg = originalImg.clone();
-      let mobileStreamWebp = originalImg.clone();
-      if (metadata.width > 330) {
-        mobileStreamJpeg.resize({ width: 330 });
-        mobileStreamWebp.resize({ width: 330 });
-      }
+      let filePathMobileJpeg = pathWithName + `_${this.prefixes[2]}` + ".jpeg";
+      let filePathMobileWebp = pathWithName + `_${this.prefixes[2]}` + ".webp";
       promises.push(
-        mobileStreamJpeg
-          .jpeg({ quality: 100 })
-          .flatten({ background: "#ffffff" })
-          .toFile(filePathMobileJpeg)
-          .then(() => (this.filePathMobile = filePathMobileJpeg)),
-        mobileStreamWebp
-          .webp({ quality: 100 })
-          .toFile(filePathMobileWebp)
-          .then(() => (this.filePathMobileWebp = filePathMobileWebp))
+        this.__saveImage(originalImg, filePathMobileJpeg, {
+          w: 330,
+          q: 100,
+        }).then(() => (this.filePathMobile = filePathMobileJpeg)),
+        this.__saveImage(originalImg, filePathMobileWebp, {
+          w: 330,
+          q: 100,
+        }).then(() => (this.filePathMobileWebp = filePathMobileWebp))
       );
       await Promise.all(promises);
-    } else if (this.externalExt) {
-      let filePathFull =
-        pathWithName + (this.originalOnly ? "" : "_full") + this.externalExt;
-      await fs
-        .writeFile(filePathFull, file.data)
-        .then(() => (this.filePathFull = filePathFull));
     } else {
-      let filePathFull = pathWithName + (this.originalOnly ? "" : "_full");
+      let filePathFull =
+        pathWithName +
+        (this.originalOnly ? "" : `_${this.prefixes[0]}`) +
+        this.externalExt;
       await fs
         .writeFile(filePathFull, file.data)
         .then(() => (this.filePathFull = filePathFull));
@@ -208,6 +276,7 @@ class Imaginator {
         filename,
         this.filePathFull,
         await sizeOf(this.filePathFull),
+        await this.getPathsAll(),
         this.connection
       );
     }
@@ -218,6 +287,18 @@ class Imaginator {
     return this.id;
   }
 
+  getPathsFull() {
+    return [
+      this.filePathFull,
+      this.filePathTablet,
+      this.filePathDesktop,
+      this.filePathMobile,
+      this.filePathFullWebp,
+      this.filePathDesktopWebp,
+      this.filePathTabletWebp,
+      this.filePathMobileWebp,
+    ];
+  }
   async getPathsAll(raw = true) {
     let result = {};
     return Promise.all([
@@ -321,6 +402,46 @@ class Imaginator {
         });
       });
     });
+  }
+
+  async __applyWatermark(imagePath, wmPath, config) {
+    //prepare
+    const wm_id = PathModule.basename(wmPath).split(".")[0];
+    const splitted = PathModule.basename(imagePath).split("_");
+    splitted.splice(1, 0, `v${wm_id}v`);
+    const outputImagePath =
+      PathModule.parse(imagePath).dir + "/" + splitted.join("_");
+    if (await checkFileExists(outputImagePath)) {
+      return getRawPath(outputImagePath);
+    }
+    //draw
+    let originalImg = await Sharp(imagePath, {
+      failOnError: false,
+    });
+    const { width, height } = await originalImg.metadata();
+    return Jimp.read(wmPath)
+      .then((JimpWrapper) =>
+        JimpWrapper.opacity(config.opacity).getBufferAsync(Jimp.MIME_PNG)
+      )
+      .then((JimpBuffer) =>
+        Sharp(JimpBuffer, {
+          failOnError: false,
+        })
+          .resize({ width: Math.round(width * config.scale) })
+          .toBuffer()
+      )
+      .then((wmBuffer) =>
+        originalImg
+          .composite([
+            {
+              input: wmBuffer,
+              top: Math.round((config.top * height) / 100),
+              left: Math.round((config.left * width) / 100),
+            },
+          ])
+          .toFile(outputImagePath)
+      )
+      .then(() => getRawPath(outputImagePath));
   }
 }
 
