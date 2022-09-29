@@ -728,4 +728,22 @@ module.exports = class Images {
     }
     return res;
   };
+  async updateWatermarkConfigs(id, configs, con) {
+      let connection,
+        res = [];
+      try {
+        connection = con || (await mysql.connection());
+        console.log([id, JSON.stringify(configs)]);
+        await connection.query("update watermarks set configs=? where id =?", [
+          JSON.stringify(configs),
+          id,
+        ]);
+      } catch (err) {
+        logger.error(err, "images.updateWatermarkConfigs:");
+        throw err;
+      } finally {
+        if (connection && !con) await connection.release();
+      }
+      return res;
+    }
 };
