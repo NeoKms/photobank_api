@@ -183,5 +183,27 @@ module.exports = () => {
       next(error);
     }
   });
+    /**
+   * @api {post} watermark/:id/configs Обновить configs ватермарки по айди
+   * @apiDescription ...
+   * @apiName watermark
+   * @apiGroup post-watermark-id
+   *
+   * @apiErrorExample {json} Error-Response:
+   HTTP/1.1 400
+   {
+         "message":"text error"
+     }
+   */
+  router.post("/:id/configs", isAccessRead(), async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      const { configs } = req.body;
+      let result = await db.images.updateWatermarkConfigs(+id, configs);
+      res.json({ message: "ok", result });
+    } catch (error) {
+      next(error);
+    }
+  });
   return router;
 };
