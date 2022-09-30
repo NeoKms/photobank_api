@@ -107,15 +107,15 @@ class Imaginator {
   async renderWatermark({ id, path, configs }) {
     const config = configs[this.sizeOfData.ratioTitle];
     if (!config) {
-      throw new Error("imaginator: no config for this ratio");
+        throw new Error("не настроен водяной знак для такого соотношения сторон");
     }
-    const paths = this.getPathsFull();
+    const pathsObj = this.getPathsFull();
     const errors = [];
-    const outputPaths = [];
+    const outputPaths = {};
     return Promise.all(
-      paths.map((imgPath) =>
+      Object.entries(pathsObj).map(([key, imgPath]) =>
         this.__applyWatermark(imgPath, path, config)
-          .then((outputPath) => outputPaths.push(outputPath))
+          .then((outputPath) => outputPaths[key] = outputPath)
           .catch((err) => errors.push(err.message))
       )
     ).then(() => ({
@@ -288,16 +288,16 @@ class Imaginator {
   }
 
   getPathsFull() {
-    return [
-      this.filePathFull,
-      this.filePathTablet,
-      this.filePathDesktop,
-      this.filePathMobile,
-      this.filePathFullWebp,
-      this.filePathDesktopWebp,
-      this.filePathTabletWebp,
-      this.filePathMobileWebp,
-    ];
+    return {
+      full: this.filePathFull,
+      tablet: this.filePathTablet,
+      desktop: this.filePathDesktop,
+      mobile: this.filePathMobile,
+      full_w: this.filePathFullWebp,
+      desktop_w: this.filePathDesktopWebp,
+      tablet_w: this.filePathTabletWebp,
+      mobile_w: this.filePathMobileWebp,
+    };
   }
   async getPathsAll(raw = true) {
     let result = {};
