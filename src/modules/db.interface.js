@@ -8,6 +8,7 @@ class DBWrapper {
     select: "",
     from: "",
     where: "",
+    whereFields: [],
     has: {},
     orderBy: "",
     limitOffset: "",
@@ -168,13 +169,12 @@ class DBWrapper {
   }
 
   paginate(options) {
+    const queryString = `select count(*) as cnt ${this.query.from} ${this.getJoinsForPagination().join(" ")} ${this.query.where} ${this.query.groupBy}`
     if (this.debug) {
       console.log(
         this.debug,
         "paginate",
-        `select count(*) as cnt ${this.query.from} ${this.query.joins.join(
-          " "
-        )} ${this.query.where} ${this.query.groupBy}`,
+        queryString,
         this.query.props
       );
     }
@@ -190,11 +190,7 @@ class DBWrapper {
         cachePaginationName = this.cacheModule.createHash(
           JSON.stringify({
             props: this.query.props,
-            query: `select count(*) as cnt ${
-              this.query.from
-            } ${this.query.joins.join(" ")} ${this.query.where} ${
-              this.query.groupBy
-            }`,
+            query: queryString,
           })
         );
         cacheData = this.cacheModule.get(cachePaginationName);
@@ -217,12 +213,7 @@ class DBWrapper {
       } else {
         this.promises.push(
           this.connection
-            .query(
-              `select count(*) as cnt ${
-                this.query.from
-              } ${this.query.joins.join(" ")} ${this.query.where}`,
-              this.query.props
-            )
+            .query(queryString, this.query.props)
             .then(([res]) => {
               this.pagination.all = res.cnt;
               this.pagination.maxPages = Math.ceil(
@@ -267,8 +258,7 @@ class DBWrapper {
           }
         }
         if (this.debug) {
-          this.debug &&
-            console.log(this.debug, "queryProps in runQuery", this.query);
+          console.log(this.debug, "queryProps in runQuery", this.query);
           console.log(
             this.debug,
             "final query:",
@@ -293,22 +283,28 @@ class DBWrapper {
       )
       .then((queryResult) => (this.query.result = queryResult))
       .then(() => this.openJsonProps())
-      .then(
-        () =>
-          this.debug &&
-          console.log(
-            this.debug,
-            "query result:",
-            this.query.result,
-            "query pagination:",
-            this.query.pagination
-          )
-      )
+      .then(() => this.debug && console.log(this.debug, 'query result:', this.query.result, 'query pagination:', this.query.pagination))
       .then(() => ({
         queryResult: this.query.result,
         has: this.query.has,
         pagination: this.pagination,
       }));
+  }
+
+  getJoinsForPagination() {
+    return Array.from(
+      this.query.whereFields.reduce((a, v) => {
+        if (Object.prototype.hasOwnProperty.call(this.map, v)) {
+          let t = this.map[v].table;
+          if (!t) return a;
+          if (this.tables[t].link) {
+            a.add(this.tables[this.tables[t].link].item);
+          }
+          a.add(this.tables[t].item);
+        }
+        return a;
+      }, new Set())
+    );
   }
 
   getJoins(select) {
@@ -345,6 +341,9 @@ class DBWrapper {
               selectArr.push(k);
             }
             if (Object.prototype.hasOwnProperty.call(map, k)) {
+              if (!this.query.whereFields.includes(k)) {
+                this.query.whereFields.push(k)
+              }
               if (eq[0] === "&" && Array.isArray(v)) {
                 if (this.map[k].type === "json") {
                   let tmp = [];
