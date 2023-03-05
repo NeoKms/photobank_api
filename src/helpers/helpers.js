@@ -3,6 +3,7 @@ const moment = require("moment");
 const fs = fsSync.promises;
 const { F_OK } = require("fs").constants;
 const crypto = require("crypto");
+const imageSize = require("image-size");
 
 const helpers = {};
 
@@ -200,4 +201,12 @@ helpers.createHashPassword = (password) => {
     )
     .digest("hex");
 };
+helpers.sizeOf = async (path) =>
+  new Promise((resolve, reject) =>
+    imageSize(path, (err, dimensions) => {
+      if (err) reject(err);
+      else resolve(dimensions);
+    })
+  );
+
 module.exports = helpers;

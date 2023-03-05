@@ -3,7 +3,7 @@ const logger = require("../helpers/logger");
 const {
   getTags,
   splitToChunks,
-  deleteFileByPath,
+  deleteFileByPath
 } = require("../helpers/helpers");
 const DBWrapper = require("../modules/db.interface");
 const Imaginator = require("../modules/imaginator");
@@ -62,7 +62,7 @@ module.exports = class Images {
 
       res = await new DBWrapper("watermarks", connection, {
         debug: false,
-        mapObj: maps.watermarks,
+        mapObj: maps.watermarks
       })
         .selectValue(select, filter, hasarr)
         .orderBy(options)
@@ -73,7 +73,7 @@ module.exports = class Images {
         page: res.pagination.page,
         maxPages: res.pagination.maxPages,
         allCount: res.pagination.all,
-        data: res.queryResult,
+        data: res.queryResult
       };
     } catch (err) {
       logger.error(err, "images.filterWatermark:");
@@ -115,7 +115,7 @@ module.exports = class Images {
       connection = con || (await mysql.connection());
       res = await connection
         .query("INSERT INTO `images`(`filename`) VALUES (?) RETURNING *", [
-          filename,
+          filename
         ])
         .then((res) => res[0].id);
     } catch (err) {
@@ -126,13 +126,13 @@ module.exports = class Images {
     }
     return res;
   };
-  setFilePathAndSize = async (id, path, metadata, con) => {
+  setFilePathAndSize = async (id, path, metadata, paths, con) => {
     let connection;
     try {
       connection = con || (await mysql.connection());
       await connection.query(
-        "update `images` set `path`=?, `width`=?, `height`=? where id = ?",
-        [path, metadata.width, metadata.height, id]
+        "update `images` set `path`=?, `width`=?, `height`=?,`paths`=? where id = ?",
+        [path, metadata.width, metadata.height, JSON.stringify(paths), id]
       );
     } catch (err) {
       logger.error(err, "images.setFilePath:");
@@ -185,7 +185,7 @@ module.exports = class Images {
 
       res = await new DBWrapper("images", connection, {
         debug: false,
-        mapObj: maps.images,
+        mapObj: maps.images
       })
         .selectValue(select, filter, hasarr)
         .orderBy(options)
@@ -245,7 +245,7 @@ module.exports = class Images {
         page: res.pagination.page,
         maxPages: res.pagination.maxPages,
         allCount: res.pagination.all,
-        data: res.queryResult,
+        data: res.queryResult
       };
     } catch (err) {
       logger.error(err, "images.__filter:");
@@ -315,7 +315,7 @@ module.exports = class Images {
           currentTimestamp,
           1,
           JSON.stringify(paths),
-          imageId,
+          imageId
         ]
       );
     } catch (err) {
@@ -379,7 +379,7 @@ module.exports = class Images {
           JSON.stringify(tags),
           delAfter,
           currentTimestamp,
-          data.id,
+          data.id
         ]
       );
     } catch (err) {
@@ -638,7 +638,7 @@ module.exports = class Images {
 
       res = await new DBWrapper("image_users_list", connection, {
         debug: false,
-        mapObj: maps.image_users_list,
+        mapObj: maps.image_users_list
       })
         .selectValue(select, filter, hasarr)
         .orderBy(options)
@@ -649,7 +649,7 @@ module.exports = class Images {
         page: res.pagination.page,
         maxPages: res.pagination.maxPages,
         allCount: res.pagination.all,
-        data: res.queryResult,
+        data: res.queryResult
       };
     } catch (err) {
       logger.error(err, "images.__filterUsers:");
@@ -673,7 +673,7 @@ module.exports = class Images {
 
       res = await new DBWrapper("images_authors", connection, {
         debug: false,
-        mapObj: maps.images_authors,
+        mapObj: maps.images_authors
       })
         .selectValue(select, filter, hasarr)
         .orderBy(options)
@@ -684,7 +684,7 @@ module.exports = class Images {
         page: res.pagination.page,
         maxPages: res.pagination.maxPages,
         allCount: res.pagination.all,
-        data: res.queryResult,
+        data: res.queryResult
       };
     } catch (err) {
       logger.error(err, "images.__filterAuthors:");
@@ -708,7 +708,7 @@ module.exports = class Images {
 
       res = await new DBWrapper("images_sources", connection, {
         debug: false,
-        mapObj: maps.images_sources,
+        mapObj: maps.images_sources
       })
         .selectValue(select, filter, hasarr)
         .orderBy(options)
@@ -719,7 +719,7 @@ module.exports = class Images {
         page: res.pagination.page,
         maxPages: res.pagination.maxPages,
         allCount: res.pagination.all,
-        data: res.queryResult,
+        data: res.queryResult
       };
     } catch (err) {
       logger.error(err, "images.__filterSources:");
@@ -728,22 +728,23 @@ module.exports = class Images {
     }
     return res;
   };
+
   async updateWatermarkConfigs(id, configs, con) {
-      let connection,
-        res = [];
-      try {
-        connection = con || (await mysql.connection());
-        console.log([id, JSON.stringify(configs)]);
-        await connection.query("update watermarks set configs=? where id =?", [
-          JSON.stringify(configs),
-          id,
-        ]);
-      } catch (err) {
-        logger.error(err, "images.updateWatermarkConfigs:");
-        throw err;
-      } finally {
-        if (connection && !con) await connection.release();
-      }
-      return res;
+    let connection,
+      res = [];
+    try {
+      connection = con || (await mysql.connection());
+      console.log([id, JSON.stringify(configs)]);
+      await connection.query("update watermarks set configs=? where id =?", [
+        JSON.stringify(configs),
+        id
+      ]);
+    } catch (err) {
+      logger.error(err, "images.updateWatermarkConfigs:");
+      throw err;
+    } finally {
+      if (connection && !con) await connection.release();
     }
+    return res;
+  }
 };

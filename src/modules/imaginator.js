@@ -38,9 +38,7 @@ class Imaginator {
   };
   baseUrl = IS_LOCAL
     ? LOCAL_DOMAIN
-    : IS_DEV
-    ? "http://smiapi.dev.lan/"
-    : "https://api-post.ttrace.ru/";
+    : "https://pbapi.jrgreez.ru/";
 
   constructor(external) {
     this.externalDB = external || require("../db/index");

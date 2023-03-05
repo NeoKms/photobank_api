@@ -1,13 +1,13 @@
 const session = require("express-session");
-const redis = require("redis");
-const RedisStore = require("connect-redis")(session);
+const RedisStore = require("connect-redis").default;
 const passport = require("passport");
 const { REDIS_SETTINGS } = require("../config");
 const JsonStrategy = require("passport-json").Strategy;
 const { createHashPassword } = require("../helpers/helpers");
 const db = require("../db");
+const Redis = require("ioredis");
 
-const redisClient = redis.createClient({
+const redisClient = new Redis({
   host: REDIS_SETTINGS.host,
   port: REDIS_SETTINGS.port,
 });
